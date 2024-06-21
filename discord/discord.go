@@ -11,11 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/bwmarrin/discordgo"
-	"github.com/gin-gonic/gin"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/h2non/filetype"
-	"golang.org/x/net/proxy"
 	"log"
 	"math/rand"
 	"net"
@@ -27,6 +22,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/bwmarrin/discordgo"
+	"github.com/gin-gonic/gin"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/h2non/filetype"
+	"golang.org/x/net/proxy"
 )
 
 var BotToken = os.Getenv("BOT_TOKEN")
@@ -437,7 +438,7 @@ func messageUpdate(s *discordgo.Session, m *discordgo.MessageUpdate) {
 	return
 }
 
-func SendMessage(c *gin.Context, channelID, cozeBotId, message string) (*discordgo.Message, string, error) {
+func SendMessage(c *gin.Context, channelID, cozeBotId, message string, attachment *string) (*discordgo.Message, string, error) {
 	var ctx context.Context
 	if c == nil {
 		ctx = context.Background()
@@ -488,13 +489,13 @@ func SendMessage(c *gin.Context, channelID, cozeBotId, message string) (*discord
 		//sentMsgId := sentMsg.ID
 		// 4.0.0 版本下 用户端发送消息
 		sendContent = strings.ReplaceAll(sendContent, "\\n", "\n")
-		sentMsgId, err := SendMsgByAuthorization(c, userAuth, sendContent, channelID)
+		sentMsgId, err := SendMsgByAuthorization(c, userAuth, sendContent, channelID, attachment)
 		if err != nil {
 			var myErr *myerr.DiscordUnauthorizedError
 			if errors.As(err, &myErr) {
 				// 无效则将此 auth 移除
 				UserAuthorizations = common.FilterSlice(UserAuthorizations, userAuth)
-				return SendMessage(c, channelID, cozeBotId, message)
+				return SendMessage(c, channelID, cozeBotId, message, attachment)
 			}
 			common.LogError(ctx, fmt.Sprintf("error sending message: %s", err))
 			return nil, "", fmt.Errorf("error sending message")
@@ -610,7 +611,7 @@ func stayActiveMessageTask() {
 				common.SysError(fmt.Sprintf("ChannelId{%s} BotId{%s} 活跃机器人任务消息发送异常!雪花Id生成失败!", sendChannelId, config.CozeBotId))
 				continue
 			}
-			_, _, err = SendMessage(nil, sendChannelId, config.CozeBotId, fmt.Sprintf("【%v】 %s", nextID, "CDP Scheduled Task Job Send Msg Success!"))
+			_, _, err = SendMessage(nil, sendChannelId, config.CozeBotId, fmt.Sprintf("【%v】 %s", nextID, "CDP Scheduled Task Job Send Msg Success!"), nil)
 			if err != nil {
 				common.SysError(fmt.Sprintf("ChannelId{%s} BotId{%s} 活跃机器人任务消息发送异常!", sendChannelId, config.CozeBotId))
 			} else {

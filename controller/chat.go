@@ -11,13 +11,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/samber/lo"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/samber/lo"
 )
 
 // Chat 发送消息
@@ -272,7 +273,7 @@ loop:
 		content = string(jsonData)
 	}
 
-	sentMsg, userAuth, err := discord.SendMessage(c, sendChannelId, calledCozeBotId, content)
+	sentMsg, userAuth, err := discord.SendMessage(c, sendChannelId, calledCozeBotId, content, request.Attachment)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.OpenAIErrorResponse{
 			OpenAIError: model.OpenAIError{
@@ -533,7 +534,7 @@ func ImagesForOpenAI(c *gin.Context) {
 		}()
 	}
 
-	sentMsg, userAuth, err := discord.SendMessage(c, sendChannelId, calledCozeBotId, common.ImgGeneratePrompt+request.Prompt)
+	sentMsg, userAuth, err := discord.SendMessage(c, sendChannelId, calledCozeBotId, common.ImgGeneratePrompt+request.Prompt, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.OpenAIErrorResponse{
 			OpenAIError: model.OpenAIError{

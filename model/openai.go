@@ -8,7 +8,8 @@ type OpenAIChatCompletionRequest struct {
 }
 
 type OpenAIChatCompletionExtraRequest struct {
-	ChannelId *string `json:"channelId"`
+	ChannelId  *string `json:"channelId"`
+	Attachment *string `json:"attachment"`
 }
 
 type OpenAIChatMessage struct {

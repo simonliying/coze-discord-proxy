@@ -7,15 +7,19 @@ import (
 	"coze-discord-proxy/common/myerr"
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 // 用户端发送消息 注意 此为临时解决方案 后续会优化代码
-func SendMsgByAuthorization(c *gin.Context, userAuth, content, channelId string) (string, error) {
+func SendMsgByAuthorization(c *gin.Context, userAuth, content, channelId string, attachment *string) (string, error) {
 	var ctx context.Context
 	if c == nil {
 		ctx = context.Background()
@@ -25,23 +29,71 @@ func SendMsgByAuthorization(c *gin.Context, userAuth, content, channelId string)
 
 	postUrl := "https://discord.com/api/v9/channels/%s/messages"
 
-	// 构造请求体
-	requestBody, err := json.Marshal(map[string]interface{}{
-		"content": content,
-	})
-	if err != nil {
-		common.LogError(ctx, fmt.Sprintf("Error encoding request body:%s", err))
-		return "", err
+	var req *http.Request
+	var err error
+	var requestBody []byte
+
+	if attachment == nil {
+		// 构造请求体
+		requestBody, err = json.Marshal(map[string]interface{}{
+			"content": content,
+		})
+		if err != nil {
+			common.LogError(ctx, fmt.Sprintf("Error encoding request body:%s", err))
+			return "", err
+		}
+
+		req, err = http.NewRequest("POST", fmt.Sprintf(postUrl, channelId), bytes.NewBuffer(requestBody))
+		if err != nil {
+			common.LogError(ctx, fmt.Sprintf("Error creating request:%s", err))
+			return "", err
+		}
+
+		// 设置请求头-部分请求头不传没问题，但目前仍有被discord检测异常的风险
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		var reqBody bytes.Buffer
+
+		// Extract the file name from the attachment path
+		fileName := filepath.Base(*attachment)
+		writer := multipart.NewWriter(&reqBody)
+		// Add the content field
+		_ = writer.WriteField("content", content)
+
+		// Add the file field
+		file, err := os.Open(*attachment)
+		if err != nil {
+			fmt.Println("Error opening file:", err)
+			return "", err
+		}
+		defer file.Close()
+
+		fileWriter, err := writer.CreateFormFile("file", fileName)
+		if err != nil {
+			fmt.Println("Error creating form file:", err)
+			return "", err
+		}
+
+		_, err = io.Copy(fileWriter, file)
+		if err != nil {
+			fmt.Println("Error copying file content:", err)
+			return "", err
+		}
+
+		// Close the writer to set the terminating boundary
+		writer.Close()
+
+		// Create a new POST request
+		req, err = http.NewRequest("POST", fmt.Sprintf(postUrl, channelId), &reqBody)
+		if err != nil {
+			fmt.Println("Error creating request:", err)
+			return "", err
+		}
+
+		// Set the necessary headers
+		req.Header.Set("Content-Type", writer.FormDataContentType())
 	}
 
-	req, err := http.NewRequest("POST", fmt.Sprintf(postUrl, channelId), bytes.NewBuffer(requestBody))
-	if err != nil {
-		common.LogError(ctx, fmt.Sprintf("Error creating request:%s", err))
-		return "", err
-	}
-
-	// 设置请求头-部分请求头不传没问题，但目前仍有被discord检测异常的风险
-	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", userAuth)
 	req.Header.Set("Origin", "https://discord.com")
 	req.Header.Set("Referer", fmt.Sprintf("https://discord.com/channels/%s/%s", GuildId, channelId))
